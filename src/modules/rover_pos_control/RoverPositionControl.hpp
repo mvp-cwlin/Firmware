@@ -70,6 +70,7 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/ekf2_timestamps.h>
+#include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/uORB.h>
 
 using matrix::Dcmf;
@@ -112,6 +113,11 @@ private:
 	int		_vehicle_attitude_sub{-1};
 	int		_sensor_combined_sub{-1};
 
+	// Added for heading correction
+	float refHeading{0};
+	float lastPitchRate{0};
+	float lastPitchAccel{0};
+
 	uORB::Subscription	_parameter_update_sub{ORB_ID(parameter_update)};
 
 	manual_control_setpoint_s		_manual_control_setpoint{};			    /**< r/c channel data */
@@ -123,6 +129,8 @@ private:
 	actuator_controls_s				_act_controls{};		/**< direct control of actuators */
 	vehicle_attitude_s				_vehicle_att{};
 	sensor_combined_s				_sensor_combined{};
+	// uORB::Subscription _angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
+	SubscriptionData<vehicle_angular_velocity_s>		_angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
 
 	SubscriptionData<vehicle_acceleration_s>		_vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
 
@@ -174,7 +182,27 @@ private:
 
 		(ParamFloat<px4::params::GND_WHEEL_BASE>) _param_wheel_base,
 		(ParamFloat<px4::params::GND_MAX_ANG>) _param_max_turn_angle,
-		(ParamFloat<px4::params::NAV_LOITER_RAD>) _param_nav_loiter_rad	/**< loiter radius for Rover */
+		(ParamFloat<px4::params::NAV_LOITER_RAD>) _param_nav_loiter_rad,	/**< loiter radius for Rover */
+
+		(ParamFloat<px4::params::HEADING_CORR_P>) _param_heading_p,
+		(ParamFloat<px4::params::HEADING_CORR_D>) _param_heading_d,
+		(ParamFloat<px4::params::HEADING_CORR_T>) _param_heading_thr,
+
+		(ParamFloat<px4::params::PITCHING_CORR_P>) _param_pitching_p,
+		(ParamFloat<px4::params::PITCHING_CORR_D>) _param_pitching_d,
+		(ParamFloat<px4::params::PITCHING_CORR_DD>) _param_pitching_dd,
+
+
+		(ParamFloat<px4::params::RC_THR>) _param_rc_thr,
+		(ParamFloat<px4::params::SHUTDOWN_THR>) _param_shutdown_thr,
+
+
+		(ParamFloat<px4::params::LPF_CONST>) _param_lpf_const,
+
+		(ParamFloat<px4::params::HGT_COG>) _param_hight_cog,
+
+		(ParamInt<px4::params::TOR_ON>) _param_torq_on,
+		(ParamFloat<px4::params::TOR_OFFSET>) _param_torq_offset
 	)
 
 	/**

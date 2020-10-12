@@ -286,3 +286,113 @@ PARAM_DEFINE_FLOAT(GND_WHEEL_BASE, 2.0f);
  * @group Rover Position Control
  */
 PARAM_DEFINE_FLOAT(GND_MAX_ANG, 0.7854f);
+
+/**
+ * Propotional Gain for heading correction.
+ *
+ * @min 0.0
+ * @decimal 3
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(HEADING_CORR_P, 1.0f);
+
+/**
+ * Differential Gain for heading correction.
+ *
+ * @min 0.0
+ * @decimal 3
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(HEADING_CORR_D, 0.2f);
+
+
+/**
+ * If heading difference is smaller then this value, don't correct.
+ *
+ * @min 0.0
+ * @decimal 3
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(HEADING_CORR_T, 0.01f);
+
+/**
+ * If RC input is smaller then this value, don't move.
+ *
+ * @min 0.0
+ * @decimal 3
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(RC_THR, 0.005f);
+
+/**
+ * Low-pass filter constant. Larger -> Higher Bandwidth
+ *
+ *
+ * @min 0.0
+ * @max 1.0
+ * @decimal 3
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(LPF_CONST, 0.5f);
+
+/**
+ * Differential Gain for pitching correction.
+ *
+ * @min 0.0
+ * @decimal 3
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(PITCHING_CORR_D, 0.3f);
+
+/**
+ * Differential Differential Gain for pitching correction.
+ *
+ * @min 0.0
+ * @decimal 3
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(PITCHING_CORR_DD, 0.2f);
+
+/**
+ * Propotional Gain for pitching correction.
+ *
+ * @min 0.0
+ * @decimal 3
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(PITCHING_CORR_P, 1.2f);
+
+/**
+ * Threshold for motor shutdown
+ *
+ * @min 0.0
+ * @decimal 3
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(SHUTDOWN_THR, 1.0f);
+
+
+/**
+ * Hight of C.O.G
+ *
+ * @min 0.0
+ * @decimal 3
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(HGT_COG, 0.065f);
+
+/**
+ * Turn on Torque Control
+ *
+ * @min 0
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_INT32(TOR_ON, 1);
+
+/**
+ * Torque Control offset
+ *
+ * @min 0
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(TOR_OFFSET, 5.0f);

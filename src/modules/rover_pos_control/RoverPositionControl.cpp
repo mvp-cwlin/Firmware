@@ -46,6 +46,8 @@
 #include <lib/ecl/geo/geo.h>
 
 #define ACTUATOR_PUBLISH_PERIOD_MS 4
+#define BATTERY_VOLT 12.0f
+#define PI 3.14159f
 
 using namespace matrix;
 
@@ -92,6 +94,12 @@ void RoverPositionControl::parameters_update(bool force)
 				   _param_gndspeed_max.get());
 	}
 }
+
+// void
+// RoverPositionControl::vehicle_angular_velocity_poll()
+// {
+// 		orb_copy(ORB_ID(vehicle_angular_velocity), _angular_velocity_sub, &_angular_velocity);
+// }
 
 void
 RoverPositionControl::vehicle_control_mode_poll()
@@ -358,6 +366,7 @@ RoverPositionControl::run()
 
 	_vehicle_attitude_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_sensor_combined_sub = orb_subscribe(ORB_ID(sensor_combined));
+	// _angular_velocity_sub = orb_subscribe(ORB_ID(vehicle_angular_velocity));
 
 	/* rate limit control mode updates to 5Hz */
 	orb_set_interval(_control_mode_sub, 200);
@@ -400,6 +409,9 @@ RoverPositionControl::run()
 		//manual_control_setpoint_poll();
 
 		_vehicle_acceleration_sub.update();
+
+		/* Added for heading control*/
+		_angular_velocity_sub.update();
 
 		/* update parameters from storage */
 		parameters_update();
@@ -495,14 +507,134 @@ RoverPositionControl::run()
 			// This should be copied even if not in manual mode. Otherwise, the poll(...) call will keep
 			// returning immediately and this loop will eat up resources.
 			orb_copy(ORB_ID(manual_control_setpoint), _manual_control_setpoint_sub, &_manual_control_setpoint);
-
+			vehicle_attitude_poll();
+			orb_copy(ORB_ID(sensor_combined), _sensor_combined_sub, &_sensor_combined);
+			// vehicle_angular_velocity_poll();
 			if (manual_mode) {
-				/* manual/direct control */
-				//PX4_INFO("Manual mode!");
-				_act_controls.control[actuator_controls_s::INDEX_ROLL] = _manual_control_setpoint.y;
-				_act_controls.control[actuator_controls_s::INDEX_PITCH] = -_manual_control_setpoint.x;
-				_act_controls.control[actuator_controls_s::INDEX_YAW] = _manual_control_setpoint.r; //TODO: Readd yaw scale param
-				_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = _manual_control_setpoint.z;
+				// /* manual/direct control */
+
+				// //PX4_INFO("Manual mode!");
+				// _act_controls.control[actuator_controls_s::INDEX_ROLL] = _manual_control_setpoint.y;
+				// _act_controls.control[actuator_controls_s::INDEX_PITCH] = -_manual_control_setpoint.x;
+				// _act_controls.control[actuator_controls_s::INDEX_YAW] = _manual_control_setpoint.r; //TODO: Readd yaw scale param
+				// _act_controls.control[actuator_controls_s::INDEX_THROTTLE] = _manual_control_setpoint.z;
+				// No inputs to ROLL and PITCH
+
+				_act_controls.control[actuator_controls_s::INDEX_ROLL] = 0;
+				_act_controls.control[actuator_controls_s::INDEX_PITCH] = 0;
+
+
+				const Eulerf euler_att{Quatf(_vehicle_att.q)};
+
+
+
+				// Control Heading using P control
+				float error = refHeading - euler_att.psi();
+
+				//Deal with Turn more than 180 degrees
+				// Always turn back with the smallest angle
+				if(error > PI)
+					error -= 2 * PI;
+				else if(error < -PI)
+					error += 2 * PI;
+
+				const float speedError = - _angular_velocity_sub.get().xyz[2];
+				const float threshold =  _param_rc_thr.get();
+
+				const float yaw = error / PI * _param_heading_p.get() + speedError / PI * _param_heading_d.get();
+				const float lpf_const = _param_lpf_const.get();
+
+				if((_manual_control_setpoint.r > 0.05f) ||  (_manual_control_setpoint.r < - 0.05f))
+					refHeading = euler_att.psi();
+
+				if(((_manual_control_setpoint.r - yaw) > threshold)
+					||  ((_manual_control_setpoint.r - yaw) < - threshold))
+					_act_controls.control[actuator_controls_s::INDEX_YAW] = lpf_const * _act_controls.control[actuator_controls_s::INDEX_YAW]
+												+ (1-lpf_const) * (_manual_control_setpoint.r) - yaw;
+				else{
+					_act_controls.control[actuator_controls_s::INDEX_YAW] *= lpf_const;
+				}
+
+				// Pitch Control
+
+				// Control Pitching using PD control
+				const float pitch = euler_att.theta();
+				const float pitchRate = 0.95f * lastPitchRate + 0.05f * _sensor_combined.gyro_rad[1];
+				const float pitchAccel = 0.99f * lastPitchAccel + 0.01f * (pitchRate - lastPitchRate)/0.004f;
+
+				if(pitch > 0.44f )
+					error = (0.44f -pitch) * _param_pitching_p.get();
+				else if(pitch < -0.44f )
+					error = (-0.44f -pitch) * _param_pitching_p.get();
+
+				// If it's falling, it should not accelerate
+				if(euler_att.theta() > 0)
+					error += pitchRate > 0.0f ? -pitchRate * _param_pitching_d.get() : 0.0f;
+				else
+					error += pitchRate < 0.0f ? -pitchRate * _param_pitching_d.get() : 0.0f;
+
+				if(euler_att.theta() > 0)
+					error += pitchAccel > 0.0f ? -pitchAccel * _param_pitching_dd.get() : 0.0f;
+				else
+					error += pitchAccel < 0.0f ? -pitchAccel * _param_pitching_dd.get() : 0.0f;
+
+				float command = _manual_control_setpoint.z * 0.9f + error;
+
+
+				// TODO: Torque limitation
+				float Km{0.1132}/*, Kb{0.2169}*/, R{2.1429}, h{_param_hight_cog.get()}, lf{0.05}, lr{0.05}, m{3.55};//, mw, rw;
+				float Icm = m * (0.2286f * 0.2286f + 0.1524f * 0.1524f) / 12.0f;
+				float Ir = Icm + m * (h*h + lr*lr);
+				float If = Icm + m * (h*h + lf*lf);
+
+
+				float maxTorque = (((cos(pitch) * lr) - (sin(pitch) * h)) * m * 9.81f)
+						    // + cos(pitch) * (lr+lf) * mw * 9.81
+						     - (lastPitchAccel * Ir);
+
+				float minTorque = 0-((((cos(pitch) * lf) + (sin(pitch) * h)) * m * 9.81f)
+						    // + cos(pitch) * (lr+lf) * mw * 9.81
+						     + (lastPitchAccel * If));
+
+				// float estimateWheelSpeed = 0 * (_act_controls.control[actuator_controls_s::INDEX_THROTTLE] - 0.5f) * 24.0f / Kb;
+
+				float maxVol = maxTorque * R / Km - _param_torq_offset.get();// + estimateWheelSpeed * Kb;
+				float minVol = minTorque * R / Km + _param_torq_offset.get();// + estimateWheelSpeed * Kb;
+
+				float maxCommand = maxVol / BATTERY_VOLT;
+				float minCommand = minVol / BATTERY_VOLT;
+
+				if(maxCommand < minCommand)
+				{
+					maxCommand = minCommand;
+					minCommand = maxVol / BATTERY_VOLT;
+				}
+
+				if(_param_torq_on.get())
+				{
+					command = command < maxCommand ? command : maxCommand;
+					command = command > minCommand ? command : minCommand;
+				}
+
+				if(((command - 0.0f) > threshold)
+					|| ((command - 0.0f) < - threshold))
+					_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = lpf_const * _act_controls.control[actuator_controls_s::INDEX_THROTTLE]
+												     + (1-lpf_const) * command;
+				else
+					_act_controls.control[actuator_controls_s::INDEX_THROTTLE] *= lpf_const;
+
+				// Safety Feature
+				// If Roll/Pitch angle larger then a threshold, stop
+				if(abs(euler_att.phi()) > _param_shutdown_thr.get() || abs(euler_att.theta()) > _param_shutdown_thr.get())
+				{
+					_act_controls.control[actuator_controls_s::INDEX_YAW] = 0.0f;
+					_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
+
+				}
+
+				lastPitchAccel = pitchAccel;
+				lastPitchRate = pitchRate;
+
 			}
 		}
 

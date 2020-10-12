@@ -1977,7 +1977,7 @@ Commander::run()
 			 * do it only for rotary wings in manual mode or fixed wing if landed.
 			 * Disable stick-disarming if arming switch or button is mapped */
 			const bool stick_in_lower_left = _manual_control_setpoint.r < -STICK_ON_OFF_LIMIT
-							 && (_manual_control_setpoint.z < 0.1f)
+			 				 && (_manual_control_setpoint.z > -0.1f && _manual_control_setpoint.z < 0.1f)
 							 && !arm_switch_or_button_mapped;
 			const bool arm_switch_to_disarm_transition = !_param_arm_switch_is_button.get() &&
 					(_last_manual_control_setpoint_arm_switch == manual_control_setpoint_s::SWITCH_POS_ON) &&
@@ -2014,17 +2014,19 @@ Commander::run()
 			 * check if left stick is in lower right position or arm button is pushed or arm switch has transition from disarm to arm
 			 * and we're in MANUAL mode.
 			 * Disable stick-arming if arming switch or button is mapped */
-			const bool stick_in_lower_right = _manual_control_setpoint.r > STICK_ON_OFF_LIMIT && _manual_control_setpoint.z < 0.1f
+			// const bool stick_in_lower_right = _manual_control_setpoint.r > STICK_ON_OFF_LIMIT && _manual_control_setpoint.z < 0.1f
+			const bool stick_in_lower_right = (_manual_control_setpoint.r > -0.1f && _manual_control_setpoint.r < 0.1f)
+							  && (_manual_control_setpoint.z > -0.1f && _manual_control_setpoint.z < 0.1f)
 							  && !arm_switch_or_button_mapped;
 			/* allow a grace period for re-arming: preflight checks don't need to pass during that time,
 			 * for example for accidential in-air disarming */
 			const bool in_rearming_grace_period = _param_com_rearm_grace.get() && (_last_disarmed_timestamp != 0)
-							      && (hrt_elapsed_time(&_last_disarmed_timestamp) < 5_s);
+							    && (hrt_elapsed_time(&_last_disarmed_timestamp) < 5_s);
 
 			const bool arm_switch_to_arm_transition = !_param_arm_switch_is_button.get() &&
 					(_last_manual_control_setpoint_arm_switch == manual_control_setpoint_s::SWITCH_POS_OFF) &&
 					(_manual_control_setpoint.arm_switch == manual_control_setpoint_s::SWITCH_POS_ON) &&
-					(_manual_control_setpoint.z < 0.1f || in_rearming_grace_period);
+					((_manual_control_setpoint.z > -0.1f && _manual_control_setpoint.z < 0.1f) || in_rearming_grace_period);
 
 			if (!in_armed_state &&
 			    (status.rc_input_mode != vehicle_status_s::RC_IN_MODE_OFF) &&
