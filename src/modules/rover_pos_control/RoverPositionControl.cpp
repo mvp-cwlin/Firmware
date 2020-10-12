@@ -48,6 +48,8 @@
 #define ACTUATOR_PUBLISH_PERIOD_MS 4
 #define BATTERY_VOLT 12.0f
 #define PI 3.14159f
+#define ENC_A (GPIO_INPUT|GPIO_PULLDOWN|GPIO_EXTI | GPIO_PORTE | GPIO_PIN14)
+#define ENC_B (GPIO_INPUT|GPIO_PULLDOWN|GPIO_EXTI | GPIO_PORTA | GPIO_PIN10)
 
 using namespace matrix;
 
@@ -392,6 +394,8 @@ RoverPositionControl::run()
 	fds[4].fd = _local_pos_sub;  // Added local position as source of position
 	fds[4].events = POLLIN;
 
+	QuadratureEncoder A(M1A,M1B);
+
 	while (!should_exit()) {
 
 		/* wait for up to 500ms for data */
@@ -520,8 +524,8 @@ RoverPositionControl::run()
 				// _act_controls.control[actuator_controls_s::INDEX_THROTTLE] = _manual_control_setpoint.z;
 				// No inputs to ROLL and PITCH
 
-				_act_controls.control[actuator_controls_s::INDEX_ROLL] = 0;
-				_act_controls.control[actuator_controls_s::INDEX_PITCH] = 0;
+				_act_controls.control[actuator_controls_s::INDEX_ROLL] = A.getCount();
+				_act_controls.control[actuator_controls_s::INDEX_PITCH] = px4_arch_gpioread(ENC_B);
 
 
 				const Eulerf euler_att{Quatf(_vehicle_att.q)};

@@ -225,3 +225,57 @@ private:
 	void		control_attitude(const vehicle_attitude_s &att, const vehicle_attitude_setpoint_s &att_sp);
 
 };
+
+
+#define M1A (GPIO_INPUT|GPIO_PULLDOWN|GPIO_EXTI | GPIO_PORTE | GPIO_PIN14)
+#define M1B (GPIO_INPUT|GPIO_PULLDOWN|GPIO_EXTI | GPIO_PORTA | GPIO_PIN10)
+
+class QuadratureEncoder{
+private:
+	int32_t count{0};
+	int32_t lastCount{0};
+	const int EncA;
+	const int EncB;
+
+	// uORB::Publication<wheel_encoders_s> _wheel_encoder_pub { ORB_ID(wheel_encoders)};
+	// wheel_encoders_s _wheelEncoderMsg;
+
+	// uint32_t _lastEncoderCount {0};
+	// int64_t _encoderCounts {0};
+	// int32_t _motorSpeeds {0};
+public:
+	QuadratureEncoder():EncA(0), EncB(0){};
+	QuadratureEncoder(int A,int B);
+	static int EncAInterruptCallback(int irq, void *context, void *arg);
+	static int EncBInterruptCallback(int irq, void *context, void *arg);
+	void taskMain();
+	int getCount(){return count;};
+};
+
+
+
+QuadratureEncoder::QuadratureEncoder(int A,int B):EncA(A), EncB(B){
+	px4_arch_gpiosetevent(EncA, true, true, true, &QuadratureEncoder::EncAInterruptCallback, this);
+	px4_arch_gpiosetevent(EncB, true, true, true, &QuadratureEncoder::EncBInterruptCallback, this);
+
+}
+
+int QuadratureEncoder::EncAInterruptCallback(int irq, void *context, void *arg)
+{
+	QuadratureEncoder *enc = static_cast<QuadratureEncoder *>(arg);
+	if(px4_arch_gpioread(enc->EncA) != px4_arch_gpioread(enc->EncB))
+		enc->count ++;
+	else
+		enc->count --;
+	return 0;
+}
+
+int QuadratureEncoder::EncBInterruptCallback(int irq, void *context, void *arg)
+{
+	QuadratureEncoder *enc = static_cast<QuadratureEncoder *>(arg);
+	if(px4_arch_gpioread(enc->EncB) == px4_arch_gpioread(enc->EncA))
+		enc->count ++;
+	else
+		enc->count --;
+	return 0;
+}

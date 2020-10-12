@@ -63,6 +63,7 @@ px4_add_board(
 		sensors
 		temperature_compensation
 		vmount
+		# quad_encoder
 	SYSTEMCMDS
 		bl_update
 		dmesg
