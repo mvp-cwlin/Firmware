@@ -394,7 +394,10 @@ RoverPositionControl::run()
 	fds[4].fd = _local_pos_sub;  // Added local position as source of position
 	fds[4].events = POLLIN;
 
-	QuadratureEncoder A(M1A,M1B);
+	QuadratureEncoder D(M4A,M4B);
+	QuadratureEncoder B(M2A,M2B);
+	QuadratureEncoder C(M3A,M3B);
+	// QuadratureEncoder A(M1A,M1B);
 
 	while (!should_exit()) {
 
@@ -524,9 +527,13 @@ RoverPositionControl::run()
 				// _act_controls.control[actuator_controls_s::INDEX_THROTTLE] = _manual_control_setpoint.z;
 				// No inputs to ROLL and PITCH
 
-				_act_controls.control[actuator_controls_s::INDEX_ROLL] = A.getCount();
-				_act_controls.control[actuator_controls_s::INDEX_PITCH] = px4_arch_gpioread(ENC_B);
+				_act_controls.control[actuator_controls_s::INDEX_ROLL] = 0;
+				_act_controls.control[actuator_controls_s::INDEX_PITCH] = 0;
 
+				_act_controls.control[actuator_controls_s::INDEX_FLAPS] = 0;//A.getCount();
+				_act_controls.control[actuator_controls_s::INDEX_SPOILERS] = B.getCount();
+				_act_controls.control[actuator_controls_s::INDEX_AIRBRAKES] = C.getCount();
+				_act_controls.control[actuator_controls_s::INDEX_LANDING_GEAR] = D.getCount();
 
 				const Eulerf euler_att{Quatf(_vehicle_att.q)};
 
