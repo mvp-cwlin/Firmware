@@ -41,7 +41,7 @@ px4_add_board(
 		pwm_out
 		px4io
 		rc_input
-		roboclaw
+		# roboclaw
 		safety_button
 		telemetry # all available telemetry drivers
 		tone_alarm
@@ -63,7 +63,7 @@ px4_add_board(
 		sensors
 		temperature_compensation
 		vmount
-		# quad_encoder
+		quad_encoder
 	SYSTEMCMDS
 		bl_update
 		dmesg

@@ -48,8 +48,6 @@
 #define ACTUATOR_PUBLISH_PERIOD_MS 4
 #define BATTERY_VOLT 12.0f
 #define PI 3.14159f
-#define ENC_A (GPIO_INPUT|GPIO_PULLDOWN|GPIO_EXTI | GPIO_PORTE | GPIO_PIN14)
-#define ENC_B (GPIO_INPUT|GPIO_PULLDOWN|GPIO_EXTI | GPIO_PORTA | GPIO_PIN10)
 
 using namespace matrix;
 
@@ -394,9 +392,9 @@ RoverPositionControl::run()
 	fds[4].fd = _local_pos_sub;  // Added local position as source of position
 	fds[4].events = POLLIN;
 
-	QuadratureEncoder D(M4A,M4B);
-	QuadratureEncoder B(M2A,M2B);
-	QuadratureEncoder C(M3A,M3B);
+	// QuadratureEncoder D(M4A,M4B);
+	// QuadratureEncoder B(M2A,M2B);
+	// QuadratureEncoder C(M3A,M3B);
 	// QuadratureEncoder A(M1A,M1B);
 
 	while (!should_exit()) {
@@ -530,10 +528,10 @@ RoverPositionControl::run()
 				_act_controls.control[actuator_controls_s::INDEX_ROLL] = 0;
 				_act_controls.control[actuator_controls_s::INDEX_PITCH] = 0;
 
-				_act_controls.control[actuator_controls_s::INDEX_FLAPS] = 0;//A.getCount();
-				_act_controls.control[actuator_controls_s::INDEX_SPOILERS] = B.getCount();
-				_act_controls.control[actuator_controls_s::INDEX_AIRBRAKES] = C.getCount();
-				_act_controls.control[actuator_controls_s::INDEX_LANDING_GEAR] = D.getCount();
+				// _act_controls.control[actuator_controls_s::INDEX_FLAPS] = 0;//A.getCount();
+				// _act_controls.control[actuator_controls_s::INDEX_SPOILERS] = B.getCount();
+				// _act_controls.control[actuator_controls_s::INDEX_AIRBRAKES] = C.getCount();
+				// _act_controls.control[actuator_controls_s::INDEX_LANDING_GEAR] = D.getCount();
 
 				const Eulerf euler_att{Quatf(_vehicle_att.q)};
 
