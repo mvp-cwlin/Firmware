@@ -106,6 +106,7 @@ void LoggedTopics::add_default_topics()
 	add_topic("vehicle_status_flags");
 	add_topic("vtol_vehicle_status", 200);
 	add_topic("yaw_estimator_status", 200);
+	add_topic_multi("wheel_encoders", 100, 2);
 
 	// multi topics
 	add_topic_multi("actuator_outputs", 100, 2);

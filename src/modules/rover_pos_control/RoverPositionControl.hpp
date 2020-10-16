@@ -57,6 +57,8 @@
 #include <px4_platform_common/module_params.h>
 #include <uORB/Subscription.hpp>
 #include <uORB/Publication.hpp>
+#include <uORB/SubscriptionMultiArray.hpp>
+#include <uORB/PublicationMulti.hpp>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/position_controller_status.h>
@@ -71,6 +73,7 @@
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/ekf2_timestamps.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
+#include <uORB/topics/wheel_encoders.h>
 #include <uORB/uORB.h>
 
 using matrix::Dcmf;
@@ -117,6 +120,7 @@ private:
 	float refHeading{0};
 	float lastPitchRate{0};
 	float lastPitchAccel{0};
+	float lastMaxVol{1}, lastMinVol{-1};
 
 	uORB::Subscription	_parameter_update_sub{ORB_ID(parameter_update)};
 
@@ -133,6 +137,10 @@ private:
 	SubscriptionData<vehicle_angular_velocity_s>		_angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
 
 	SubscriptionData<vehicle_acceleration_s>		_vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
+
+	uORB::SubscriptionMultiArray<wheel_encoders_s,2> _wheel_encoder_sub{ORB_ID::wheel_encoders};
+	wheel_encoders_s _wheelEncoderMsg[2];
+
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
 
@@ -202,7 +210,10 @@ private:
 		(ParamFloat<px4::params::HGT_COG>) _param_hight_cog,
 
 		(ParamInt<px4::params::TOR_ON>) _param_torq_on,
-		(ParamFloat<px4::params::TOR_OFFSET>) _param_torq_offset
+		(ParamFloat<px4::params::TOR_OFFSET>) _param_torq_offset,
+
+		(ParamFloat<px4::params::MOTOR_TOR_CONST>) _param_torq_const,
+		(ParamFloat<px4::params::MOTOR_EMF_CONST>) _param_emf_const
 	)
 
 	/**

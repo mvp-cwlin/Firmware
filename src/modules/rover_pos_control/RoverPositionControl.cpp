@@ -514,25 +514,20 @@ RoverPositionControl::run()
 			orb_copy(ORB_ID(manual_control_setpoint), _manual_control_setpoint_sub, &_manual_control_setpoint);
 			vehicle_attitude_poll();
 			orb_copy(ORB_ID(sensor_combined), _sensor_combined_sub, &_sensor_combined);
+
+			_wheel_encoder_sub[0].update(&_wheelEncoderMsg[0]);
+			_wheel_encoder_sub[1].update(&_wheelEncoderMsg[1]);
+
+
 			// vehicle_angular_velocity_poll();
 			if (manual_mode) {
 				// /* manual/direct control */
-
-				// //PX4_INFO("Manual mode!");
-				// _act_controls.control[actuator_controls_s::INDEX_ROLL] = _manual_control_setpoint.y;
-				// _act_controls.control[actuator_controls_s::INDEX_PITCH] = -_manual_control_setpoint.x;
-				// _act_controls.control[actuator_controls_s::INDEX_YAW] = _manual_control_setpoint.r; //TODO: Readd yaw scale param
-				// _act_controls.control[actuator_controls_s::INDEX_THROTTLE] = _manual_control_setpoint.z;
 				// No inputs to ROLL and PITCH
 
-				_act_controls.control[actuator_controls_s::INDEX_ROLL] = 0;
-				_act_controls.control[actuator_controls_s::INDEX_PITCH] = 0;
+				_act_controls.control[actuator_controls_s::INDEX_ROLL] = 0.0f;
+				_act_controls.control[actuator_controls_s::INDEX_PITCH] = 0.0f;
 
-				// _act_controls.control[actuator_controls_s::INDEX_FLAPS] = 0;//A.getCount();
-				// _act_controls.control[actuator_controls_s::INDEX_SPOILERS] = B.getCount();
-				// _act_controls.control[actuator_controls_s::INDEX_AIRBRAKES] = C.getCount();
-				// _act_controls.control[actuator_controls_s::INDEX_LANDING_GEAR] = D.getCount();
-
+				// Convert Quterion to Eular angle
 				const Eulerf euler_att{Quatf(_vehicle_att.q)};
 
 
@@ -568,30 +563,30 @@ RoverPositionControl::run()
 
 				// Control Pitching using PD control
 				const float pitch = euler_att.theta();
-				const float pitchRate = 0.95f * lastPitchRate + 0.05f * _sensor_combined.gyro_rad[1];
+				const float pitchRate = 0.96f * lastPitchRate + 0.04f * _sensor_combined.gyro_rad[1];
 				const float pitchAccel = 0.99f * lastPitchAccel + 0.01f * (pitchRate - lastPitchRate)/0.004f;
 
 				if(pitch > 0.44f )
-					error = (0.44f -pitch) * _param_pitching_p.get();
+					error = (0.44f - pitch) * _param_pitching_p.get();
 				else if(pitch < -0.44f )
-					error = (-0.44f -pitch) * _param_pitching_p.get();
+					error = (-0.44f - pitch) * _param_pitching_p.get();
 
-				// If it's falling, it should not accelerate
+				error += (-pitchRate * _param_pitching_d.get() - pitchAccel * _param_pitching_dd.get());
+
+				// If it's falling, it should let it fall to equilibrium, not accelerate
 				if(euler_att.theta() > 0)
-					error += pitchRate > 0.0f ? -pitchRate * _param_pitching_d.get() : 0.0f;
+				{
+					error = error < 0 ? error : 0;
+				}
 				else
-					error += pitchRate < 0.0f ? -pitchRate * _param_pitching_d.get() : 0.0f;
-
-				if(euler_att.theta() > 0)
-					error += pitchAccel > 0.0f ? -pitchAccel * _param_pitching_dd.get() : 0.0f;
-				else
-					error += pitchAccel < 0.0f ? -pitchAccel * _param_pitching_dd.get() : 0.0f;
-
+				{
+					error = error > 0 ? error : 0;
+				}
 				float command = _manual_control_setpoint.z * 0.9f + error;
 
 
-				// TODO: Torque limitation
-				float Km{0.1132}/*, Kb{0.2169}*/, R{2.1429}, h{_param_hight_cog.get()}, lf{0.05}, lr{0.05}, m{3.55};//, mw, rw;
+				// Torque limitation
+				float Km{_param_torq_const.get()}, Kb{_param_emf_const.get()}, R{2.1429}, h{_param_hight_cog.get()}, lf{0.05}, lr{0.05}, m{3.55};//, mw, rw;
 				float Icm = m * (0.2286f * 0.2286f + 0.1524f * 0.1524f) / 12.0f;
 				float Ir = Icm + m * (h*h + lr*lr);
 				float If = Icm + m * (h*h + lf*lf);
@@ -605,10 +600,8 @@ RoverPositionControl::run()
 						    // + cos(pitch) * (lr+lf) * mw * 9.81
 						     + (lastPitchAccel * If));
 
-				// float estimateWheelSpeed = 0 * (_act_controls.control[actuator_controls_s::INDEX_THROTTLE] - 0.5f) * 24.0f / Kb;
-
-				float maxVol = maxTorque * R / Km - _param_torq_offset.get();// + estimateWheelSpeed * Kb;
-				float minVol = minTorque * R / Km + _param_torq_offset.get();// + estimateWheelSpeed * Kb;
+				float maxVol = maxTorque * R / Km - _param_torq_offset.get() + _wheelEncoderMsg[1].speed * Kb;
+				float minVol = minTorque * R / Km + _param_torq_offset.get() + _wheelEncoderMsg[0].speed * Kb;
 
 				float maxCommand = maxVol / BATTERY_VOLT;
 				float minCommand = minVol / BATTERY_VOLT;
@@ -619,18 +612,27 @@ RoverPositionControl::run()
 					minCommand = maxVol / BATTERY_VOLT;
 				}
 
-				if(_param_torq_on.get())
-				{
-					command = command < maxCommand ? command : maxCommand;
-					command = command > minCommand ? command : minCommand;
-				}
+				// maxCommand = 0.95f * lastMaxVol + 0.05f * maxCommand;
+				// minCommand = 0.95f * lastMinVol + 0.05f * minCommand;
 
-				if(((command - 0.0f) > threshold)
-					|| ((command - 0.0f) < - threshold))
+				// lastMaxVol = maxCommand;
+				// lastMinVol = minCommand;
+
+				_act_controls.control[actuator_controls_s::INDEX_ROLL] = maxCommand;
+				_act_controls.control[actuator_controls_s::INDEX_PITCH] = minCommand;
+
+				if((command  > threshold)
+					|| (command < - threshold))
 					_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = lpf_const * _act_controls.control[actuator_controls_s::INDEX_THROTTLE]
 												     + (1-lpf_const) * command;
 				else
 					_act_controls.control[actuator_controls_s::INDEX_THROTTLE] *= lpf_const;
+
+				if(_param_torq_on.get())
+				{
+					_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = _act_controls.control[actuator_controls_s::INDEX_THROTTLE]  < maxCommand ? _act_controls.control[actuator_controls_s::INDEX_THROTTLE]  : maxCommand;
+					_act_controls.control[actuator_controls_s::INDEX_THROTTLE]  = _act_controls.control[actuator_controls_s::INDEX_THROTTLE]  > minCommand ? _act_controls.control[actuator_controls_s::INDEX_THROTTLE]  : minCommand;
+				}
 
 				// Safety Feature
 				// If Roll/Pitch angle larger then a threshold, stop

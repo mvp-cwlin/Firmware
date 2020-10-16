@@ -396,3 +396,19 @@ PARAM_DEFINE_INT32(TOR_ON, 1);
  * @group Rover Position Control
  */
 PARAM_DEFINE_FLOAT(TOR_OFFSET, 5.0f);
+
+/**
+ * Km
+ *
+ * @min 0
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(MOTOR_TOR_CONST, 0.1132f);
+
+/**
+ * Kb
+ *
+ * @min 0
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(MOTOR_EMF_CONST, 0.2169f);
