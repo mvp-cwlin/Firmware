@@ -417,6 +417,10 @@ RoverPositionControl::run()
 
 		/* Added for heading control*/
 		_angular_velocity_sub.update();
+		_angular_acceleration_sub.update();
+
+		_wheel_encoder_sub[0].update(&_wheelEncoderMsg[0]);
+		_wheel_encoder_sub[1].update(&_wheelEncoderMsg[1]);
 
 		/* update parameters from storage */
 		parameters_update();
@@ -515,10 +519,6 @@ RoverPositionControl::run()
 			vehicle_attitude_poll();
 			orb_copy(ORB_ID(sensor_combined), _sensor_combined_sub, &_sensor_combined);
 
-			_wheel_encoder_sub[0].update(&_wheelEncoderMsg[0]);
-			_wheel_encoder_sub[1].update(&_wheelEncoderMsg[1]);
-
-
 			// vehicle_angular_velocity_poll();
 			if (manual_mode) {
 				// /* manual/direct control */
@@ -563,8 +563,8 @@ RoverPositionControl::run()
 
 				// Control Pitching using PD control
 				const float pitch = euler_att.theta();
-				const float pitchRate = 0.96f * lastPitchRate + 0.04f * _sensor_combined.gyro_rad[1];
-				const float pitchAccel = 0.99f * lastPitchAccel + 0.01f * (pitchRate - lastPitchRate)/0.004f;
+				const float pitchRate = 0.96f * lastPitchRate + 0.04f * _angular_velocity_sub.get().xyz[1];
+				const float pitchAccel = 0.99f * lastPitchAccel + 0.01f * _angular_acceleration_sub.get().xyz[1]/0.004f;
 
 				if(pitch > 0.44f )
 					error = (0.44f - pitch) * _param_pitching_p.get();

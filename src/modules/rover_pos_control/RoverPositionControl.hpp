@@ -72,7 +72,9 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/ekf2_timestamps.h>
+
 #include <uORB/topics/vehicle_angular_velocity.h>
+#include <uORB/topics/vehicle_angular_acceleration.h>
 #include <uORB/topics/wheel_encoders.h>
 #include <uORB/uORB.h>
 
@@ -135,7 +137,7 @@ private:
 	sensor_combined_s				_sensor_combined{};
 	// uORB::Subscription _angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
 	SubscriptionData<vehicle_angular_velocity_s>		_angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
-
+	SubscriptionData<vehicle_angular_acceleration_s>	_angular_acceleration_sub{ORB_ID(vehicle_angular_acceleration)};
 	SubscriptionData<vehicle_acceleration_s>		_vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
 
 	uORB::SubscriptionMultiArray<wheel_encoders_s,2> _wheel_encoder_sub{ORB_ID::wheel_encoders};
